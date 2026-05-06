@@ -6,11 +6,11 @@
 /*   By: doleksiu <doleksiu@student.42warsaw.pl>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/12 13:21:15 by doleksiu          #+#    #+#             */
-/*   Updated: 2026/01/19 17:45:33 by doleksiu         ###   ########.fr       */
+/*   Updated: 2026/04/15 17:08:22 by doleksiu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../includes/minishell.h"
+#include "minishell.h"
 
 // t_token	*last_node(t_token *node)
 // {
@@ -20,14 +20,13 @@
 // 		node = node->next;
 // 	return (node);
 // }
-
 t_token	*create_token_node(t_data *data, t_token **token)
 {
 	t_token	*node;
 
 	node = malloc(sizeof(t_token));
 	if (!node)
-		clean_exit(data, "Malloc failed");
+		clean_exit(data, "Malloc failed", 0);
 	node->content = NULL;
 	node->next = NULL;
 	if (*token != NULL)
@@ -40,14 +39,7 @@ t_token	*create_token_node(t_data *data, t_token **token)
 	return (node);
 }
 
-int	check_separator(char c)
-{
-	if (c == ' ' || c == '>' || c == '<' || c == '|' || c == '\t')
-		return (1);
-	return (0);
-}
-
-void	get_next_word(t_data *data, char *line, int *i)
+int	get_next_word(char *line, int *i)
 {
 	int	status;
 
@@ -67,25 +59,39 @@ void	get_next_word(t_data *data, char *line, int *i)
 		(*i)++;
 	}
 	if (status == IN_SINGLE || status == IN_DOUBLE)
-		clean_exit(data, "bad quotes");
+	{
+		ft_putstr_fd("minishell: bad quotes\n", 2);
+		return (1);
+	}
+	return (0);
 }
 
 void	get_next_operator(char *line, int *start, int *i)
 {
-	if (line[*i] == '|')
-		*start = (*i);
-	else if (ft_strncmp(line + (*i), ">>", 2) == 0
+	if (ft_strncmp(line + (*i), ">>", 2) == 0
 		|| ft_strncmp(line + (*i), "<<", 2) == 0)
 	{
 		*start = (*i);
 		(*i)++;
 	}
-	else if (line[*i] == '<' || line[*i] == '>')
+	else if (line[*i] == '|' || line[*i] == '<' || line[*i] == '>')
 		*start = (*i);
 	(*i)++;
 }
 
-void	tokenizer(t_data *data)
+int	get_next_token(char *line, int *i, int *start)
+{
+	if (check_separator(line[*i]) == 0)
+	{
+		if (get_next_word(line, i) == 1)
+			return (1);
+	}
+	else
+		get_next_operator(line, start, i);
+	return (0);
+}
+
+int	tokenizer(t_data *data)
 {
 	int		i;
 	int		start;
@@ -100,33 +106,14 @@ void	tokenizer(t_data *data)
 		start = i;
 		if (data->line[i])
 		{
-			if (!check_separator(data->line[i]))
-				get_next_word(data, data->line, &i);
-			else
-				get_next_operator(data->line, &start, &i);
+			if (get_next_token(data->line, &i, &start))
+				return (1);
 			current_token = create_token_node(data, &current_token);
 			current_token->content = ft_substr(data->line, start, i - start);
 		}
 	}
 	assign_token_type(data);
-	check_syntax(data);
+	if (check_syntax(data) != 0)
+		return (2);
+	return (0);
 }
-
-// int	main(void)
-// {
-// 	t_data data;
-// 	t_token *token;
-// 	t_token *temp;
-
-// 	data.line = get_next_line(0);
-// 	tokenizer(&data);
-// 	token =  data.token_head;
-// 	while (token)
-// 	{
-// 		printf("%sX, type: %d \n", token->content, token->type);
-// 		free(token->content);
-// 		temp = token;
-// 		token = token->next;
-// 		free(temp);
-// 	}
-// }

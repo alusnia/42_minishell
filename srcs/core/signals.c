@@ -3,14 +3,14 @@
 /*                                                        :::      ::::::::   */
 /*   signals.c                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: doleksiu <doleksiu@student.42warsaw.pl>    +#+  +:+       +#+        */
+/*   By: alusnia <alusnia@student.42Warsaw.pl>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/06 14:39:52 by doleksiu          #+#    #+#             */
-/*   Updated: 2026/01/24 18:21:45 by doleksiu         ###   ########.fr       */
+/*   Updated: 2026/05/05 06:57:35 by alusnia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../includes/minishell.h"
+#include "minishell.h"
 
 volatile sig_atomic_t	g_signum;
 
@@ -20,32 +20,38 @@ void	sig_handler(int sig)
 	if (sig == SIGINT)
 	{
 		write(STDOUT_FILENO, "^C\n", 3);
-		rl_on_new_line();
-		rl_replace_line("", 0);
-		rl_redisplay();
+		if (isatty(STDIN_FILENO))
+		{
+			rl_on_new_line();
+			rl_replace_line("", 0);
+			rl_redisplay();
+		}
 	}
 }
 
-int	config_sigaction(struct sigaction *sa)
+void	sig_handler_child(int sig)
 {
-	ft_bzero(sa, sizeof(*sa));
-	if ((sigaddset(&sa->sa_mask, SIGINT) == -1)
-		|| (sigaddset(&sa->sa_mask, SIGQUIT) == -1))
-		return (1);
-	sa->sa_handler = &sig_handler;
-	return (0);
+	g_signum = sig;
+	if (sig == SIGINT)
+	{
+		write(STDOUT_FILENO, "^C", 2);
+		close(0);
+	}
 }
 
-int	signals(void)
+	// if ((sigaddset(&sa.sa_mask, SIGINT) == -1)
+	// 	|| (sigaddset(&sa.sa_mask, SIGQUIT) == -1))
+	// 	return (1);
+
+int	setup_signal(int sig, void (*handler)(int))
 {
 	struct sigaction	sa;
 
-	if (config_sigaction(&sa) == 1)
-		return (1);
-	if (sigaction(SIGINT, &sa, NULL) == -1)
-		return (1);
-	sa.sa_handler = SIG_IGN;
-	if (sigaction(SIGQUIT, &sa, NULL) == -1)
+	ft_bzero(&sa, sizeof(sa));
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	sa.sa_handler = handler;
+	if (sigaction(sig, &sa, NULL) == -1)
 		return (1);
 	return (0);
 }

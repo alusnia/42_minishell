@@ -6,36 +6,72 @@
 /*   By: alusnia <alusnia@student.42Warsaw.pl>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/05 14:46:43 by alusnia           #+#    #+#             */
-/*   Updated: 2026/02/02 19:34:19 by alusnia          ###   ########.fr       */
+/*   Updated: 2026/04/28 10:59:34 by alusnia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../includes/minishell.h"
-/*
-static void	handle_redir_error(t_type type, t_redir path)
-{
+#include "minishell.h"
+#include "executor.h"
 
-	if (t
-}
-*/
 /*
 Function is printing input from the user directly into the pipe, it will
 continue till user enters exactly the same input as delimiter
 */
-static void read_input(int out, char *delimiter)
+static void	read_input(t_exec_info *ex_info, int out, char *delimiter)
 {
-	char 	*str;
+	char	*str;
 	size_t	len;
 
 	len = ft_strlen(delimiter);
-	str = get_next_line(0);
-	while (str && (len != ft_strlen(str) - 1 || ft_strncmp(delimiter, str, len)))
+	if (setup_signal(SIGINT, &sig_handler_child) == 1
+		|| setup_signal(SIGQUIT, SIG_IGN) == 1)
+		return (clean_exec(ex_info, NULL, 1, NULL));
+	str = readline("> ");
+	while (str && (len != ft_strlen(str)
+			|| !ft_strisequal(delimiter, str, len + 1)))
 	{
-		ft_putstr_fd(str, out);
+		ft_putendl_fd(str, out);
 		free(str);
-		str = get_next_line(0);
+		str = readline("> ");
+		if (g_signum != 0)
+		{
+			clean_exec(ex_info, "", 128 + g_signum, NULL);
+			if (str)
+				free(str);
+		}
 	}
+	if (str)
+		free(str);
 	close(out);
+	clean_exec(ex_info, "", 0, NULL);
+}
+
+static t_exec_info	*handle_heredoc(t_exec_info *ex_info, char *delimiter)
+{
+	int		status;
+
+	status = 0;
+	if (!pipe(ex_info->pipe_fd))
+	{
+		ex_info->pid = fork();
+		if (ex_info->pid == -1)
+			return (ex_info->error = 1, ex_info);
+		else if (ex_info->pid == 0)
+			read_input(ex_info, ex_info->pipe_fd[1], delimiter);
+	}
+	else
+		return (ex_info->error = 2, ex_info);
+	close(ex_info->pipe_fd[1]);
+	if (setup_signal(SIGINT, SIG_IGN) == 1
+		|| setup_signal(SIGQUIT, SIG_IGN) == 1)
+		return (ex_info->error = 1, ex_info);
+	waitpid(ex_info->pid, &status, 0);
+	ex_info->in = ex_info->pipe_fd[0];
+	errno = translate_status(0, 0, status, 0);
+	tcsetattr(STDIN_FILENO, TCSANOW, &ex_info->data->termios_p_save);
+	if (setup_signal(SIGINT, &sig_handler) || setup_signal(SIGQUIT, SIG_IGN))
+		return (ex_info->error = 1, ex_info);
+	return (ex_info->error = errno, ex_info);
 }
 
 /*
@@ -46,15 +82,7 @@ will assign 1 to error code, or if error ocurred function assigns 2.
 static t_exec_info	*redirection(t_exec_info *ex_info, t_type type, char *path)
 {
 	if (type == HEREDOC)
-	{
-		if (!pipe(ex_info->pipe_fd))
-		{
-			read_input(ex_info->pipe_fd[1], path);
-			ex_info->in = ex_info->pipe_fd[0];
-		}
-		else
-			return (ex_info->error = 2, ex_info);
-	}
+		ex_info = handle_heredoc(ex_info, path);
 	else if (type == REDIR_IN)
 		ex_info->in = open(path, O_RDONLY);
 	else if (type == APPEND)
@@ -69,27 +97,10 @@ static t_exec_info	*redirection(t_exec_info *ex_info, t_type type, char *path)
 /*
 Function loops thru redir list and executes redir for each node.
 */
-// t_exec_info *redir(t_exec_info *ex_info, t_redir *redir)
-// {
-// 	ex_info->redir_in = 0;
-// 	ex_info->redir_out = 0;
-// 	while (redir)
-// 	{
-// 		if (redir->type == REDIR_IN || redir->type == HEREDOC)
-// 			ex_info->redir_in = 1;
-// 		else if (redir->type == REDIR_OUT || redir->type == APPEND)
-// 			ex_info->redir_out = 1;
-// 		ex_info = redirection(ex_info, redir->type, redir->filename);
-// 		if (ex_info->error)
-// 			return (perror("minishell"), ex_info);
-// 		redir = redir->next;
-// 	}
-// 	return (ex_info);
-//}
-t_exec_info *redir(t_exec_info *ex_info, t_redir *redir)
+t_exec_info	*redir(t_exec_info *ex_info, t_redir *redir)
 {
 	ex_info->redir_in = 0;
-	ex_info->redir_out = 1;
+	ex_info->redir_out = 0;
 	ex_info->error = 0;
 	while (redir)
 	{
@@ -107,10 +118,8 @@ t_exec_info *redir(t_exec_info *ex_info, t_redir *redir)
 		}
 		ex_info = redirection(ex_info, redir->type, redir->filename);
 		if (ex_info->error)
-			return (ex_info->error = errno, perror("minishell"), ex_info);
+			return (ex_info->error = 1, perror("minishell"), ex_info);
 		redir = redir->next;
 	}
-	if (!ex_info->redir_out)
-		ex_info->out = STDOUT_FILENO;
 	return (ex_info);
 }
