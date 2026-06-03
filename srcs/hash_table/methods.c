@@ -6,7 +6,7 @@
 /*   By: alusnia <alusnia@student.42Warsaw.pl>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/08 13:54:42 by alusnia           #+#    #+#             */
-/*   Updated: 2026/05/05 08:15:36 by alusnia          ###   ########.fr       */
+/*   Updated: 2026/06/03 05:49:39 by alusnia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,7 @@ void	del(t_table **table, char *key)
 {
 	t_list	*node;
 
+	sort(table);
 	node = find(*table, key);
 	if (!node)
 		return ;
@@ -35,7 +36,12 @@ void	del(t_table **table, char *key)
 	else
 		connect_nodes(&node->prev, &node->next, REGULAR);
 	if (!node->prev[SORTED])
-		(*table)->sorted_list = node->next[SORTED];
+	{
+		if ((*table)->sorted_list == node)
+			(*table)->sorted_list = node->next[SORTED];
+		if ((*table)->env == node)
+			(*table)->env = node->next[SORTED];
+	}
 	else
 		connect_nodes(&node->prev, &node->next, SORTED);
 	free_list(node, ONE);
@@ -48,30 +54,32 @@ char	*get(t_table *table, char *key)
 	node = find(table, key);
 	if (node)
 		return (node->value);
-	return (NULL);
+	return ("");
 }
 
-int	set(t_table **table, char *str)
+int	set(t_table **table, char *arg)
 {
 	char	*key;
 	char	*value;
+	char	*str;
 	t_list	*node;
 
-	str = ft_strdup(str);
+	str = ft_strdup(arg);
 	if (!str || seperate_string(str, &key, &value))
 		return (1);
 	if (verify_key(key))
 	{
-		ft_putstr_fd("bash: export: `", 2);
-		ft_putstr_fd(key, 2);
+		ft_putstr_fd("minishell: export: `", 2);
+		ft_putstr_fd(arg, 2);
 		ft_putendl_fd("': not a valid identifier", 2);
-		if (value)
-			free(value);
-		free(key);
-		return (1);
+		return (free(value), free(key), 1);
 	}
 	node = find(*table, key);
 	if (node)
-		return (free(key), free(node->value), node->value = value, 0);
+	{
+		if (value)
+			return (free(key), free(node->value), node->value = value, 0);
+		return (free(key), 0);
+	}
 	return (table_add(table, key, value));
 }

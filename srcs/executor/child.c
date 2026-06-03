@@ -6,16 +6,29 @@
 /*   By: alusnia <alusnia@student.42Warsaw.pl>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/20 17:17:07 by alusnia           #+#    #+#             */
-/*   Updated: 2026/05/05 07:10:24 by alusnia          ###   ########.fr       */
+/*   Updated: 2026/06/03 05:43:08 by alusnia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "executor.h"
 
+int	setup_child_signals_and_termios(t_data *data)
+{
+	if (isatty(STDIN_FILENO))
+	{
+		if (tcsetattr(STDIN_FILENO, TCSANOW, &data->termios_p_save) != 0)
+			return (1);
+		if (setup_signal(SIGINT, SIG_DFL) != 0)
+			return (1);
+		if (setup_signal(SIGQUIT, SIG_DFL) != 0)
+			return (1);
+	}
+	return (0);
+}
+
 void	set_up_child(t_data *data, t_exec_info *exec_info, t_cmd *cmd)
 {
-	set_terminal_settings(data, 1);
-	if (setup_signal(SIGINT, SIG_DFL) || setup_signal(SIGQUIT, SIG_DFL))
+	if (setup_child_signals_and_termios(data) != 0)
 		clean_exec(data->exec_info, NULL, 1, NULL);
 	dup2(exec_info->in, 0);
 	if (exec_info->redir_out)
@@ -27,9 +40,9 @@ void	set_up_child(t_data *data, t_exec_info *exec_info, t_cmd *cmd)
 
 void	do_your_job(t_data *data, t_exec_info *exec_info, t_cmd *cmd)
 {
-	exec_info->args = filtr_cmd(cmd);
-	if (!exec_info->args)
-		return (clean_exec(exec_info, "malloc failed\n", 1, NULL));
+	if (!cmd->args)
+		clean_exec(exec_info, "", 0, NULL);
+	exec_info->args = cmd->args;
 	if (!exec_info->args[0])
 		return (clean_exec(exec_info, "", 0, NULL));
 	if (check_for_built_ins(data, cmd))

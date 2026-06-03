@@ -6,18 +6,35 @@
 /*   By: alusnia <alusnia@student.42Warsaw.pl>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/04/17 21:19:55 by alusnia           #+#    #+#             */
-/*   Updated: 2026/05/05 07:22:59 by alusnia          ###   ########.fr       */
+/*   Updated: 2026/05/15 21:05:32 by alusnia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "executor.h"
 
+static void	manage_signal(int status)
+{
+	int				sig;
+
+	sig = WTERMSIG(status);
+	if (sig == SIGINT)
+	{
+		g_signum = sig;
+		ft_putendl_fd("", 2);
+	}
+	if (sig == SIGQUIT)
+	{
+		g_signum = sig;
+		ft_putendl_fd("Quit (core dumped)", 2);
+	}
+}
+
 unsigned char	translate_status(pid_t data_pid, pid_t pid,
 				int status, unsigned char error)
 {
-	int				sig;
 	unsigned char	exit_code;
 
+	exit_code = 0;
 	if (pid == data_pid)
 	{
 		if (WIFEXITED(status) && !error)
@@ -25,19 +42,7 @@ unsigned char	translate_status(pid_t data_pid, pid_t pid,
 		else
 			exit_code = error;
 		if (WIFSIGNALED(status))
-		{
-			sig = WTERMSIG(status);
-			if (sig == SIGINT)
-			{
-				g_signum = sig;
-				write(1, "\n", 1);
-			}
-			if (sig == SIGQUIT)
-			{
-				g_signum = sig;
-				write(1, "Quit (core dumped)\n", 20);
-			}
-		}
+			manage_signal(status);
 	}
 	return (exit_code);
 }
@@ -47,11 +52,15 @@ void	check_out_children(t_exec_info *exec_info, int *exit_code)
 	pid_t	pid;
 	int		status;
 
+	status = 0;
 	pid = waitpid(-1, &status, 0);
 	if (isatty(STDIN_FILENO))
+	{
+		tcsetattr(STDIN_FILENO, TCSANOW, &exec_info->data->termios_p_save);
 		if (setup_signal(SIGINT, &sig_handler)
 			|| setup_signal(SIGQUIT, SIG_IGN))
 			return (clean_exec(exec_info, NULL, 0, NULL));
+	}
 	while (pid > 0)
 	{
 		*exit_code = translate_status(exec_info->pid, pid,
@@ -60,13 +69,19 @@ void	check_out_children(t_exec_info *exec_info, int *exit_code)
 	}
 }
 
-t_exec_info	*give_birth(t_data *data, t_exec_info *exec_info, t_cmd *cmd)
+static t_exec_info	*prepare_for_labor(t_exec_info *exec_info, t_cmd *cmd)
 {
 	exec_info = redir(exec_info, cmd->redirs);
 	if (g_signum)
 		return (exec_info);
 	if (pipe(exec_info->pipe_fd) == -1)
 		return (exec_info->error += exec_info->error == 0, exec_info);
+	return (exec_info);
+}
+
+t_exec_info	*give_birth(t_data *data, t_exec_info *exec_info, t_cmd *cmd)
+{
+	exec_info = prepare_for_labor(exec_info, cmd);
 	if (exec_info->error)
 	{
 		if (exec_info->in)

@@ -6,12 +6,26 @@
 /*   By: alusnia <alusnia@student.42Warsaw.pl>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/05 14:46:43 by alusnia           #+#    #+#             */
-/*   Updated: 2026/04/28 10:59:34 by alusnia          ###   ########.fr       */
+/*   Updated: 2026/06/03 05:54:26 by alusnia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "minishell.h"
 #include "executor.h"
+
+static char	*read_input_with_correct_reader(void)
+{
+	char	*str;
+
+	if (isatty(STDIN_FILENO))
+		str = readline("> ");
+	else
+	{
+		str = get_next_line(STDIN_FILENO);
+		str[ft_strlen(str) - 1] = '\0';
+	}
+	return (str);
+}
 
 /*
 Function is printing input from the user directly into the pipe, it will
@@ -23,16 +37,15 @@ static void	read_input(t_exec_info *ex_info, int out, char *delimiter)
 	size_t	len;
 
 	len = ft_strlen(delimiter);
-	if (setup_signal(SIGINT, &sig_handler_child) == 1
-		|| setup_signal(SIGQUIT, SIG_IGN) == 1)
+	if (setup_signal(SIGINT, &sig_handler_heredoc) != 0
+		|| setup_signal(SIGQUIT, SIG_IGN) != 0)
 		return (clean_exec(ex_info, NULL, 1, NULL));
-	str = readline("> ");
-	while (str && (len != ft_strlen(str)
-			|| !ft_strisequal(delimiter, str, len + 1)))
+	str = read_input_with_correct_reader();
+	while (str && !ft_strisequal(delimiter, str, len + 1))
 	{
 		ft_putendl_fd(str, out);
 		free(str);
-		str = readline("> ");
+		str = read_input_with_correct_reader();
 		if (g_signum != 0)
 		{
 			clean_exec(ex_info, "", 128 + g_signum, NULL);
@@ -53,6 +66,9 @@ static t_exec_info	*handle_heredoc(t_exec_info *ex_info, char *delimiter)
 	status = 0;
 	if (!pipe(ex_info->pipe_fd))
 	{
+		if (setup_signal(SIGINT, SIG_IGN) != 0
+			|| setup_signal(SIGQUIT, SIG_IGN) != 0)
+			return (ex_info->error = 1, ex_info);
 		ex_info->pid = fork();
 		if (ex_info->pid == -1)
 			return (ex_info->error = 1, ex_info);
@@ -62,16 +78,13 @@ static t_exec_info	*handle_heredoc(t_exec_info *ex_info, char *delimiter)
 	else
 		return (ex_info->error = 2, ex_info);
 	close(ex_info->pipe_fd[1]);
-	if (setup_signal(SIGINT, SIG_IGN) == 1
-		|| setup_signal(SIGQUIT, SIG_IGN) == 1)
-		return (ex_info->error = 1, ex_info);
 	waitpid(ex_info->pid, &status, 0);
 	ex_info->in = ex_info->pipe_fd[0];
-	errno = translate_status(0, 0, status, 0);
-	tcsetattr(STDIN_FILENO, TCSANOW, &ex_info->data->termios_p_save);
-	if (setup_signal(SIGINT, &sig_handler) || setup_signal(SIGQUIT, SIG_IGN))
+	ex_info->error = translate_status(0, 0, status, 0);
+	if (setup_signal(SIGINT, &sig_handler) != 0
+		|| setup_signal(SIGQUIT, SIG_IGN) != 0)
 		return (ex_info->error = 1, ex_info);
-	return (ex_info->error = errno, ex_info);
+	return (ex_info);
 }
 
 /*
@@ -112,13 +125,15 @@ t_exec_info	*redir(t_exec_info *ex_info, t_redir *redir)
 		}
 		else if (redir->type == REDIR_OUT || redir->type == APPEND)
 		{
-			if (ex_info->out && ex_info->redir_out)
+			if (ex_info->out > 0 && ex_info->redir_out)
 				close(ex_info->out);
 			ex_info->redir_out = 1;
 		}
 		ex_info = redirection(ex_info, redir->type, redir->filename);
+		if (ex_info->error && redir->type != HEREDOC)
+			perror("minishell");
 		if (ex_info->error)
-			return (ex_info->error = 1, perror("minishell"), ex_info);
+			return (ex_info);
 		redir = redir->next;
 	}
 	return (ex_info);

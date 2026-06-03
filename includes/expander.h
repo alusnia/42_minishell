@@ -1,27 +1,30 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_strjoin.c                                       :+:      :+:    :+:   */
+/*   expander.h                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: doleksiu <doleksiu@student.42warsaw.pl>    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2025/09/29 10:45:45 by alusnia           #+#    #+#             */
-/*   Updated: 2026/01/25 12:42:24 by doleksiu         ###   ########.fr       */
+/*   Created: 2026/05/09 20:47:58 by doleksiu          #+#    #+#             */
+/*   Updated: 2026/05/10 11:22:43 by doleksiu         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "libft.h"
+#ifndef EXPANDER_H	
+# define EXPANDER_H
 
-char	*ft_strjoin(char const *s1, char const *s2)
+typedef struct s_data	t_data;
+
+typedef struct s_exp_data
 {
-	char	*ptr;
+	int		i;
+	char	c;
+	int		start;
+	int		status;
+	int		key_len;
+}	t_exp_data;
 
-	ptr = NULL;
-	ptr = ft_calloc(ft_strlen(s1) + ft_strlen(s2) + 1, sizeof(char));
-	if (ptr)
-	{
-		ft_memcpy(ptr, s1, ft_strlen(s1));
-		ft_memcpy(ptr + ft_strlen(s1), s2, ft_strlen(s2));
-	}
-	return (ptr);
-}
+void	expander(t_data *data);
+void	append_dollar(t_data *data, t_exp_data *exp, char *content, char **res);
+
+#endif

@@ -6,23 +6,46 @@
 /*   By: alusnia <alusnia@student.42Warsaw.pl>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/05 14:52:39 by alusnia           #+#    #+#             */
-/*   Updated: 2026/05/05 06:08:01 by alusnia          ###   ########.fr       */
+/*   Updated: 2026/06/03 07:29:35 by alusnia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "minishell.h"
 
-void	print_tokens(t_data *data)
-{
-	t_token	*token;
+// void	print_tokens(t_data *data)
+// {
+// 	t_token	*token;
 
-	token = data->token_head;
-	while (token)
-	{
-		printf("%s, type: %d \n", token->content, token->type);
-		token = token->next;
-	}
-}
+// 	token = data->token_head;
+// 	while (token)
+// 	{
+// 		printf("%s, type: %d \n", token->content, token->type);
+// 		token = token->next;
+// 	}
+// }
+
+// void	print_cmds(t_cmd *cmd)
+// {
+// 	int	i;
+
+// 	i = 0;
+// 	while (cmd)
+// 	{
+// 		i = 0;
+// 		while (cmd->args && cmd->args[i])
+// 		{
+// 			printf("args %d: %s \n", i, cmd->args[i]);
+// 			i++;
+// 		}
+// 		while (cmd->redirs)
+// 		{
+// 			printf("file: %s, redir type: %d \n",
+// 				cmd->redirs->filename, cmd->redirs->type);
+// 			cmd->redirs = cmd->redirs->next;
+// 		}
+// 		cmd = cmd->next;
+// 	}
+// }
 
 int	minishell(t_data *data)
 {
@@ -38,7 +61,7 @@ int	minishell(t_data *data)
 		free_tokens(data);
 		return (1);
 	}
-	expand_tokens(data);
+	expander(data);
 	parser(data);
 	if (data->line)
 	{
@@ -58,7 +81,7 @@ int	main(int argc, char **argv, char **envp)
 	t_data	data;
 
 	(void) argc;
-	argv[0] = NULL;
+	(void) argv;
 	if (init(&data, envp) != 0)
 	{
 		data.exit_code = 0;
