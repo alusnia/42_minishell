@@ -6,7 +6,7 @@
 /*   By: alusnia <alusnia@student.42Warsaw.pl>      +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/06 14:35:08 by doleksiu          #+#    #+#             */
-/*   Updated: 2026/05/30 07:38:20 by alusnia          ###   ########.fr       */
+/*   Updated: 2026/06/09 14:57:00 by alusnia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,6 +34,8 @@ int	init(t_data *data, char **envp)
 	if (isatty(STDIN_FILENO) && init_signals(data) == 1)
 		return (1);
 	data->exec_info = ft_calloc(1, sizeof(t_exec_info));
+	if (!data->exec_info)
+		return (1);
 	data->exec_info->out = 1;
 	data->table = table_init(envp);
 	if (!data->table)
